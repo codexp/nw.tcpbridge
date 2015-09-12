@@ -1,0 +1,17 @@
+{
+  "name": "nw-tcpbridge-server",
+  "version": "0.0.1",
+  "private": true,
+  "main": "view/server.html",
+  "window": {
+    "show": true,
+    "frame": true,
+    "toolbar": false,
+    "icon": "app.icns",
+    "width": 550,
+    "height": 348
+  },
+  "scripts": {
+    "start": "nw ."
+  }
+}
