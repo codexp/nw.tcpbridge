@@ -1,144 +1,174 @@
 "use strict";
 
+var EventEmitter = require('events').EventEmitter;
+var TrayMenu = require('../public/js/tray-menu');
 var gui = require('nw.gui');
-var customTray = new require('../public/js/tray-menu');
 var util = require('util');
 var net = require('net');
-var client = new net.Socket();
 var Timer = require('../public/js/timer');
-var autoConnector = new Timer(3000);
-var autoConnect = true;
-var ui = {
-        btn: {}
-    };
 
+var EOL = '\n';
 var HOST = '127.0.0.1';
 var PORT = 6969;
 
-// Extend application menu for Mac OS
-if (process.platform == "darwin") {
-    var menu = new gui.Menu({type: "menubar"});
-    menu.createMacBuiltin && menu.createMacBuiltin(window.document.title);
-    gui.Window.get().menu = menu;
-}
+class ClientApp extends EventEmitter {
+    constructor() {
+        var $ = ClientApp.$;
+        var $cli = this;
+        var win = gui.Window.get();
+        var tray = new TrayMenu();
+        var client = new net.Socket();
+        var autoConnector = new Timer(3000);
 
-function $(selector) {
-    if ('function' === typeof selector) {
-        return document.addEventListener('DOMContentLoaded', selector);
-    }
-    return document.querySelector(selector);
-}
+        this.win = win;
+        this.tray = tray;
+        this.client = client;
+        this.autoConnector = autoConnector;
+        this.autoConnect = true;
+        this.ui = {
+            btn: {}
+        };
 
-function writeLog(msg, type) {
-    var logElement = $("#output");
-    if (logElement) {
-        logElement.innerHTML += `<span class=${type}>${msg}</span><br>`;
-        logElement.scrollTop = logElement.scrollHeight;
-    }
-    process.stdout.write(String(msg) + "\n");
-}
-
-function updateAutoConnectCaption() {
-    if (autoConnect) {
-        ui.btn.autoconnect.innerText = '✖';
-        ui.btn.autoconnect.setAttribute('title', 'stop autoconnect');
-    } else {
-        ui.btn.autoconnect.innerText = '✔';
-        ui.btn.autoconnect.setAttribute('title', 'enable autoconnect');
-    }
-}
-
-function updateConnectCaption() {
-    if (client.connected) {
-        ui.btn.connect.innerText = 'disconnect';
-    } else {
-        ui.btn.connect.innerText = 'connect';
-    }
-}
-
-// Add a 'data' event handler for the client socket
-// data is what the server sent to this socket
-client.on('data', function (data) {
-    writeLog('DATA: ' + data);
-    // Close the client socket completely
-    //client.destroy();
-});
-
-// Add a 'close' event handler for the client socket
-client.on('connect', function () {
-    client.connected = true;
-    writeLog('connected to: ' + HOST + ':' + PORT);
-    // Write a message to the socket as soon as the client is connected, the server will receive it as message from the client
-    client.write('I am Chuck Norris!');
-    updateConnectCaption();
-});
-
-client.on('close', function (hadError) {
-    client.connected = false;
-    writeLog('connection closed' + (hadError ? ' (error)' : ''));
-    updateConnectCaption();
-});
-
-client.on('error', function (err) {
-    // consume error
-});
-
-$(function () {
-    /*
-     * init ui elements
-     */
-    ui.btn.connect      = $('#connect');
-    ui.btn.autoconnect  = $('#autoconnect');
-
-    updateAutoConnectCaption();
-
-    autoConnector
-        .on('timer', function () {
-            if (autoConnect && !client.connected) {
-                client.connect(PORT, HOST);
-            }
-        }.bind(autoConnector))
-        .start();
-
-    ui.btn.autoconnect.addEventListener('click', function () {
-        autoConnect = !autoConnect;
-        updateAutoConnectCaption();
-    });
-
-    ui.btn.connect.addEventListener('click', function () {
-        if (client.connected) {
-            client.end();
-            autoConnector.stop();
-        } else {
-            client.connect(PORT, HOST);
-            autoConnector.delay();
+        // Extend application menu for Mac OS
+        if ('darwin' === process.platform) {
+            var menu = new gui.Menu({type: "menubar"});
+            menu.createMacBuiltin && menu.createMacBuiltin(window.document.title);
+            gui.Window.get().menu = menu;
         }
-    });
 
-    // bring window to front when open via terminal
-    gui.Window.get().focus();
+        // Add a 'close' event handler for the client socket
+        client.on('connect', function () {
+            client.connected = true;
+            client._buf = '';
+            $cli.writeLog('connected to: ' + HOST + ':' + PORT);
+            // Write a message to the socket as soon as the client is connected, the server will receive it as message from the client
+            client.write('I am Chuck Norris!\n');
+            $cli.updateConnectCaption();
+        });
 
-    // for nw-notify frameless windows
-    gui.Window.get().on('close', function () {
-        gui.App.quit();
-    });
-});
+        client.on('close', function (hadError) {
+            client.connected = false;
+            $cli.writeLog('connection closed' + (hadError ? ' (error)' : ''));
+            $cli.updateConnectCaption();
+        });
 
-process.on('log', function (message) {
-    writeLog(message);
-});
+        client.on('error', function (err) {
+            // consume error
+        });
 
-// print error message in log window
-process.on('uncaughtException', function (exception) {
-    var stack = exception.stack.split("\n");
-    stack.forEach(function (line) {
-        writeLog(line, 'error');
-    });
-});
+        // receive incomming data
+        client.on('data', function (data) {
+            client._buf += data.toString();
+            // see if there is one or more complete messages
+            if (client._buf.indexOf(EOL) >= 0) {
+                // slice up the buffer into messages
+                var msgs = client._buf.split(EOL);
+                for (var i = 0; i < msgs.length - 2; ++i) {
+                    $cli.emit('msg', msgs[i]);
+                }
+                // keep unterminated message in buffer
+                client._buf = msgs[msgs.length - 1];
+            }
+        });
 
-process.on('exit', function (code) {
-    if (customTray) {
-        customTray.remove();
-        customTray = undefined;
+        this.on('msg', function (msg) {
+            process.emit('log', 'msg: ' + msg);
+        });
+
+        process.on('log', function (message) {
+            $cli.writeLog(message);
+        });
+
+        // print error message in log window
+        process.on('uncaughtException', function (exception) {
+            var stack = exception.stack.split("\n");
+            stack.forEach(function (line) {
+                $cli.writeLog(line, 'error');
+            });
+        });
+
+        process.on('exit', function (code) {
+            if (tray) {
+                tray.remove();
+                tray = undefined;
+            }
+        });
+
+        $(function () {
+            /*
+             * init ui elements
+             */
+            this.ui.btn.connect = $('#connect');
+            this.ui.btn.autoconnect = $('#autoconnect');
+            this.ui.out = $("#output");
+
+            this.updateAutoConnectCaption();
+
+            autoConnector
+                .on('timer', function () {
+                    if ($cli.autoConnect && !client.connected) {
+                        client.connect(PORT, HOST);
+                    }
+                }.bind(autoConnector))
+                .start();
+
+            this.ui.btn.autoconnect.addEventListener('click', function () {
+                $cli.autoConnect = !$cli.autoConnect;
+                $cli.updateAutoConnectCaption();
+            });
+
+            this.ui.btn.connect.addEventListener('click', function () {
+                if (client.connected) {
+                    client.end();
+                    autoConnector.stop();
+                } else {
+                    client.connect(PORT, HOST);
+                    autoConnector.delay();
+                }
+            });
+
+            // for nw-notify frameless windows
+            win.on('close', function () {
+                gui.App.quit();
+            });
+
+            // bring window to front when open via terminal
+            win.focus();
+        }.bind(this));
     }
-});
+
+    writeLog(msg, type) {
+        if (this.ui.out) {
+            this.ui.out.innerHTML += `<span class=${type}>${msg}</span><br>`;
+            this.ui.out.scrollTop = this.ui.out.scrollHeight;
+        }
+        process.stdout.write(String(msg) + "\n");
+    }
+
+    updateAutoConnectCaption() {
+        if (this.autoConnect) {
+            this.ui.btn.autoconnect.innerText = '✖';
+            this.ui.btn.autoconnect.setAttribute('title', 'stop autoconnect');
+        } else {
+            this.ui.btn.autoconnect.innerText = '✔';
+            this.ui.btn.autoconnect.setAttribute('title', 'enable autoconnect');
+        }
+    }
+
+    updateConnectCaption() {
+        if (this.client.connected) {
+            this.ui.btn.connect.innerText = 'disconnect';
+        } else {
+            this.ui.btn.connect.innerText = 'connect';
+        }
+    }
+
+    static $(selector) {
+        if ('function' === typeof selector) {
+            return document.addEventListener('DOMContentLoaded', selector);
+        }
+        return document.querySelector(selector);
+    }
+}
+
+var client = new ClientApp();

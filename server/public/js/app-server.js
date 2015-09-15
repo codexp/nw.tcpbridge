@@ -3,6 +3,7 @@
 var net = require('net');
 var clients = {};
 var PORT = 6969;
+var EOL = '\n';
 
 var writeLog = function (msg, type) {
     var logElement = $("#output");
@@ -34,7 +35,7 @@ var server = net.createServer(function (sock) {
         delete clients[sock.uid]
         writeLog('client disconnected ' + sock.uid);
     });
-    sock.write('hello\r\n');
+    sock.write('hello' + EOL);
 
     // Add a 'data' event handler to this instance of socket
     sock.on('data', function (data) {
