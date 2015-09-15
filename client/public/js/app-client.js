@@ -7,6 +7,10 @@ var net = require('net');
 var client = new net.Socket();
 var Timer = require('../public/js/timer');
 var autoConnector = new Timer(3000);
+var autoConnect = true;
+var ui = {
+        btn: {}
+    };
 
 var HOST = '127.0.0.1';
 var PORT = 6969;
@@ -18,21 +22,39 @@ if (process.platform == "darwin") {
     gui.Window.get().menu = menu;
 }
 
-var $ = function (selector) {
+function $(selector) {
     if ('function' === typeof selector) {
         return document.addEventListener('DOMContentLoaded', selector);
     }
     return document.querySelector(selector);
-};
+}
 
-var writeLog = function (msg, type) {
+function writeLog(msg, type) {
     var logElement = $("#output");
     if (logElement) {
         logElement.innerHTML += `<span class=${type}>${msg}</span><br>`;
         logElement.scrollTop = logElement.scrollHeight;
     }
     process.stdout.write(String(msg) + "\n");
-};
+}
+
+function updateAutoConnectCaption() {
+    if (autoConnect) {
+        ui.btn.autoconnect.innerText = '✖';
+        ui.btn.autoconnect.setAttribute('title', 'stop autoconnect');
+    } else {
+        ui.btn.autoconnect.innerText = '✔';
+        ui.btn.autoconnect.setAttribute('title', 'enable autoconnect');
+    }
+}
+
+function updateConnectCaption() {
+    if (client.connected) {
+        ui.btn.connect.innerText = 'disconnect';
+    } else {
+        ui.btn.connect.innerText = 'connect';
+    }
+}
 
 // Add a 'data' event handler for the client socket
 // data is what the server sent to this socket
@@ -48,11 +70,13 @@ client.on('connect', function () {
     writeLog('connected to: ' + HOST + ':' + PORT);
     // Write a message to the socket as soon as the client is connected, the server will receive it as message from the client
     client.write('I am Chuck Norris!');
+    updateConnectCaption();
 });
 
 client.on('close', function (hadError) {
     client.connected = false;
     writeLog('connection closed' + (hadError ? ' (error)' : ''));
+    updateConnectCaption();
 });
 
 client.on('error', function (err) {
@@ -60,15 +84,28 @@ client.on('error', function (err) {
 });
 
 $(function () {
+    /*
+     * init ui elements
+     */
+    ui.btn.connect      = $('#connect');
+    ui.btn.autoconnect  = $('#autoconnect');
+
+    updateAutoConnectCaption();
+
     autoConnector
         .on('timer', function () {
-            if (!client.connected) {
+            if (autoConnect && !client.connected) {
                 client.connect(PORT, HOST);
             }
         }.bind(autoConnector))
         .start();
 
-    $('#connect').addEventListener('click', function () {
+    ui.btn.autoconnect.addEventListener('click', function () {
+        autoConnect = !autoConnect;
+        updateAutoConnectCaption();
+    });
+
+    ui.btn.connect.addEventListener('click', function () {
         if (client.connected) {
             client.end();
             autoConnector.stop();
