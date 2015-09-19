@@ -14,7 +14,7 @@ var PORT = 6969;
 class ClientApp extends EventEmitter {
     constructor() {
         var $ = ClientApp.$;
-        var $cli = this;
+        var $app = this;
         var win = gui.Window.get();
         var tray = new TrayMenu();
         var client = new net.Socket();
@@ -40,16 +40,16 @@ class ClientApp extends EventEmitter {
         client.on('connect', function () {
             client.connected = true;
             client._buf = '';
-            $cli.writeLog('connected to: ' + HOST + ':' + PORT);
-            // Write a message to the socket as soon as the client is connected, the server will receive it as message from the client
-            client.write('I am Chuck Norris!\n');
-            $cli.updateConnectCaption();
+            $app.writeLog('connected to: ' + HOST + ':' + PORT);
+            // Authorization
+            client.write(JSON.stringify({ auth: { password: 'password' }}) + EOL);
+            $app.updateConnectCaption();
         });
 
         client.on('close', function (hadError) {
             client.connected = false;
-            $cli.writeLog('connection closed' + (hadError ? ' (error)' : ''));
-            $cli.updateConnectCaption();
+            $app.writeLog('connection closed' + (hadError ? ' (error)' : ''));
+            $app.updateConnectCaption();
         });
 
         client.on('error', function (err) {
@@ -64,7 +64,7 @@ class ClientApp extends EventEmitter {
                 // slice up the buffer into messages
                 var msgs = client._buf.split(EOL);
                 for (var i = 0; i < msgs.length - 2; ++i) {
-                    $cli.emit('msg', msgs[i]);
+                    $app.emit('msg', msgs[i]);
                 }
                 // keep unterminated message in buffer
                 client._buf = msgs[msgs.length - 1];
@@ -76,14 +76,14 @@ class ClientApp extends EventEmitter {
         });
 
         process.on('log', function (message) {
-            $cli.writeLog(message);
+            $app.writeLog(message);
         });
 
         // print error message in log window
         process.on('uncaughtException', function (exception) {
             var stack = exception.stack.split("\n");
             stack.forEach(function (line) {
-                $cli.writeLog(line, 'error');
+                $app.writeLog(line, 'error');
             });
         });
 
@@ -106,15 +106,15 @@ class ClientApp extends EventEmitter {
 
             autoConnector
                 .on('timer', function () {
-                    if ($cli.autoConnect && !client.connected) {
+                    if ($app.autoConnect && !client.connected) {
                         client.connect(PORT, HOST);
                     }
                 }.bind(autoConnector))
                 .start();
 
             this.ui.btn.autoconnect.addEventListener('click', function () {
-                $cli.autoConnect = !$cli.autoConnect;
-                $cli.updateAutoConnectCaption();
+                $app.autoConnect = !$app.autoConnect;
+                $app.updateAutoConnectCaption();
             });
 
             this.ui.btn.connect.addEventListener('click', function () {
@@ -171,4 +171,4 @@ class ClientApp extends EventEmitter {
     }
 }
 
-var client = new ClientApp();
+var app = new ClientApp();
