@@ -1,5 +1,5 @@
 {
-  "name": "nw.tcpbridge-server",
+  "name": "@codexp/nw.tcpbridge-server",
   "version": "0.0.1",
   "main": "view/server.html",
   "window": {
@@ -18,6 +18,8 @@
     "url": "codexp/nw.tcpbridge"
   },
   "dependencies": {
+    "@codexp/buffer-segment-parser": "0.0.1",
     "@codexp/nw.tray-menu": "0.0.1"
-  }
+  },
+  "license": "ISC"
 }

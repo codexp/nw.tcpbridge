@@ -2,6 +2,7 @@
 
 var EventEmitter = require('events').EventEmitter;
 var TrayMenu = require('@codexp/nw.tray-menu');
+var JSONBufferParser = require('@codexp/buffer-segment-parser').JSON;
 var gui = require('nw.gui');
 var util = require('util');
 var net = require('net');
@@ -48,20 +49,16 @@ class BridgeServer extends EventEmitter {
             $srv.shutdown(err);
         });
 
-        sock._buf = '';
-        sock.on('data', function (data) {
-            sock._buf += data.toString();
-            // see if there is one or more complete messages
-            if (sock._buf.indexOf(EOL) >= 0) {
-                // slice up the buffer into messages
-                var msgs = sock._buf.split(EOL);
-                for (var i = 0; i < msgs.length - 1; ++i) {
-                    $srv.onCommand(msgs[i]);
+        var parser = new JSONBufferParser();
+        sock.on('data', parser.parser());
+        parser
+            .on('json', $srv.onCommand.bind($srv))
+            .on('error', function (err) {
+                process.emit('log', 'error: invalid bridge command');
+                if (!$srv.auth) {
+                    $srv.shutdown(new BridgeServerError(BridgeServerError.ERR.AUTH_REQUIRED));
                 }
-                // keep unterminated message in buffer
-                sock._buf = msgs[i];
-            }
-        });
+            });
 
         $srv.timeOutHandle = setTimeout(function () {
             if (!$srv.auth) {
@@ -70,22 +67,11 @@ class BridgeServer extends EventEmitter {
         }, BridgeServer.UNAUTHORIZED_CONN_TIMEOUT)
     }
 
-    onCommand(data) {
+    onCommand(cmd) {
         var $srv = this;
-        var cmd;
-
-        try {
-            cmd = JSON.parse(data);
-        } catch (err) {
-            process.emit('log', 'error: invalid bridge command');
-            if (!$srv.auth) {
-                $srv.shutdown(new BridgeServerError(BridgeServerError.ERR.AUTH_REQUIRED));
-            }
-            return;
-        }
 
         if ($srv.auth) {
-            process.emit('log', 'error: invalid bridge command');
+            process.emit('log', 'error: unknown bridge command');
         } else {
             if (cmd.auth) {
                 if ('password' === cmd.auth.password) {
@@ -105,6 +91,8 @@ class BridgeServer extends EventEmitter {
         var $srv = this;
 
         process.emit('log', 'bridge authorized ' + $srv.uid);
+
+        $srv.sock.write(JSON.stringify({ auth: true }) + EOL);
 
         $srv.channelServer = net.createServer($srv.onChannelConnection.bind($srv));
         $srv.channelServer.on('error', function (err) {

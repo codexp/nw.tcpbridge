@@ -2,6 +2,7 @@
 
 var EventEmitter = require('events').EventEmitter;
 var TrayMenu = require('@codexp/nw.tray-menu');
+var JSONBufferParser = require('@codexp/buffer-segment-parser').JSON;
 var Timer = require('@codexp/timer');
 var gui = require('nw.gui');
 var util = require('util');
@@ -56,24 +57,13 @@ class ClientApp extends EventEmitter {
             // consume error
         });
 
-        // receive incomming data
-        client.on('data', function (data) {
-            client._buf += data.toString();
-            // see if there is one or more complete messages
-            if (client._buf.indexOf(EOL) >= 0) {
-                // slice up the buffer into messages
-                var msgs = client._buf.split(EOL);
-                for (var i = 0; i < msgs.length - 2; ++i) {
-                    $app.emit('msg', msgs[i]);
-                }
-                // keep unterminated message in buffer
-                client._buf = msgs[msgs.length - 1];
-            }
-        });
-
-        this.on('msg', function (msg) {
-            process.emit('log', 'msg: ' + msg);
-        });
+        var parser = new JSONBufferParser();
+        client.on('data', parser.parser());
+        parser
+            .on('json', $app.onCommand.bind($app))
+            .on('error', function (err) {
+                $app.writeLog('error: invalid command');
+            });
 
         process.on('log', function (message) {
             $app.writeLog(message);
@@ -135,6 +125,11 @@ class ClientApp extends EventEmitter {
             // bring window to front when open via terminal
             win.focus();
         }.bind(this));
+    }
+
+    onCommand(cmd) {
+        var $app = this;
+        process.emit('log', 'cmd: ' + util.inspect(cmd));
     }
 
     writeLog(msg, type) {
