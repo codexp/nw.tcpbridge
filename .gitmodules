@@ -1,0 +1,6 @@
+[submodule "buffer-segment-parser"]
+	path = buffer-segment-parser
+	url = git@github.com:codexp/buffer-segment-parser.js.git
+[submodule "tray-menu"]
+	path = tray-menu
+	url = git@github.com:codexp/nw.tray-menu.git
