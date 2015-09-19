@@ -13,6 +13,10 @@
   "scripts": {
     "start": "nw ."
   },
+  "repository": {
+    "type": "git",
+    "url": "codexp/nw.tcpbridge"
+  },
   "dependencies": {
     "@codexp/nw.tray-menu": "0.0.1"
   }
