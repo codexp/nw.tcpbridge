@@ -1,7 +1,7 @@
 "use strict";
 
 var EventEmitter = require('events').EventEmitter;
-var TrayMenu = require('../public/js/tray-menu');
+var TrayMenu = require('@codexp/nw.tray-menu');
 var Timer = require('@codexp/timer');
 var gui = require('nw.gui');
 var util = require('util');

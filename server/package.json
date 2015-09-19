@@ -1,7 +1,6 @@
 {
-  "name": "nw-tcpbridge-server",
+  "name": "nw.tcpbridge-server",
   "version": "0.0.1",
-  "private": true,
   "main": "view/server.html",
   "window": {
     "show": true,
@@ -13,5 +12,8 @@
   },
   "scripts": {
     "start": "nw ."
+  },
+  "dependencies": {
+    "@codexp/nw.tray-menu": "0.0.1"
   }
 }

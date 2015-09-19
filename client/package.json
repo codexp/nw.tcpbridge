@@ -1,7 +1,6 @@
 {
-  "name": "nw-tcpbridge-client",
+  "name": "nw.tcpbridge-client",
   "version": "0.0.1",
-  "private": true,
   "main": "view/client.html",
   "window": {
     "show": true,
@@ -15,6 +14,7 @@
     "start": "nw ."
   },
   "dependencies": {
+    "@codexp/nw.tray-menu": "0.0.1",
     "@codexp/timer": "0.0.4"
   }
 }
