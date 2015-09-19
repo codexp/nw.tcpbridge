@@ -2,10 +2,10 @@
 
 var EventEmitter = require('events').EventEmitter;
 var TrayMenu = require('../public/js/tray-menu');
+var Timer = require('@codexp/timer');
 var gui = require('nw.gui');
 var util = require('util');
 var net = require('net');
-var Timer = require('../public/js/timer');
 
 var EOL = '\n';
 var HOST = '127.0.0.1';
